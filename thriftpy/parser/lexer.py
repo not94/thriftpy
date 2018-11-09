@@ -142,6 +142,7 @@ keywords = (
     'const',
     'required',
     'optional',
+    'apicomment',
 )
 
 
@@ -173,7 +174,7 @@ def t_ignore_SILLYCOMM(t):
 
 
 def t_ignore_MULTICOMM(t):
-    r'\/\*[^*]\/*([^*/]|[^*]\/|\*[^/])*\**\*\/'
+    r'\/\*[^*]\/*[^@]([^*/]|[^*]\/|\*[^/])*\**\*\/'
     t.lexer.lineno += t.value.count('\n')
 
 
@@ -188,6 +189,12 @@ def t_ignore_UNIXCOMMENT(t):
 
 def t_ignore_COMMENT(t):
     r'\/\/[^\n]*'
+
+
+def t_APICOMMENT(t):
+    r'\/\*\s*@@[^*]\/*([^*/]|[^*]\/|\*[^/])*\**\*\/'
+    t.lexer.lineno += t.value.count("\n")
+    return t
 
 
 def t_BOOLCONSTANT(t):

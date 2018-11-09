@@ -318,19 +318,34 @@ def p_field_seq(p):
 
 def p_field(p):
     '''field : field_id field_req field_type IDENTIFIER
-             | field_id field_req field_type IDENTIFIER '=' const_value'''
-
-    if len(p) == 7:
-        try:
-            val = _cast(p[3])(p[6])
-        except AssertionError:
-            raise ThriftParserError(
-                'Type error for field %s '
-                'at line %d' % (p[4], p.lineno(4)))
+             | field_id field_req field_type IDENTIFIER '=' const_value
+             | APICOMMENT field_id field_req field_type IDENTIFIER
+             | APICOMMENT field_id field_req field_type IDENTIFIER '=' const_value
+             '''
+    has_api_comment = (len(p) in (6, 8))
+    if has_api_comment:
+        if len(p) == 8:
+            try:
+                val = _cast(p[4])(p[6])
+            except AssertionError:
+                raise ThriftParserError(
+                    'Type error for field %s '
+                    'at line %d' % (p[4], p.lineno(4)))
+        else:
+            val = None
+        p[0] = [p[2], p[3], p[4], p[5], val, p[1]]
     else:
-        val = None
+        if len(p) == 7:
+            try:
+                val = _cast(p[3])(p[6])
+            except AssertionError:
+                raise ThriftParserError(
+                    'Type error for field %s '
+                    'at line %d' % (p[4], p.lineno(4)))
+        else:
+            val = None
 
-    p[0] = [p[1], p[2], p[3], p[4], val]
+        p[0] = [p[1], p[2], p[3], p[4], val, None]
 
 
 def p_field_id(p):
@@ -763,7 +778,7 @@ def _fill_in_struct(cls, fields, _gen_init=True):
                                       'already been used') % (
                                           field[0], field[3]))
         ttype = field[2]
-        thrift_spec[field[0]] = _ttype_spec(ttype, field[3], field[1])
+        thrift_spec[field[0]] = _ttype_spec(ttype, field[3], field[1], field[5])
         default_spec.append((field[3], field[4]))
         _tspec[field[3]] = field[1], ttype
     setattr(cls, 'thrift_spec', thrift_spec)
@@ -815,11 +830,11 @@ def _make_service(name, funcs, extends):
     return cls
 
 
-def _ttype_spec(ttype, name, required=False):
+def _ttype_spec(ttype, name, required=False, comment=''):
     if isinstance(ttype, int):
-        return ttype, name, required
+        return ttype, name, required, comment
     else:
-        return ttype[0], name, ttype[1], required
+        return ttype[0], name, ttype[1], required, comment
 
 
 def _get_ttype(inst, default_ttype=None):
