@@ -271,21 +271,41 @@ def p_function(p):
     '''function : ONEWAY function_type IDENTIFIER '(' field_seq ')' throws
                 | ONEWAY function_type IDENTIFIER '(' field_seq ')'
                 | function_type IDENTIFIER '(' field_seq ')' throws
-                | function_type IDENTIFIER '(' field_seq ')' '''
+                | function_type IDENTIFIER '(' field_seq ')'
+                | APICOMMENT ONEWAY function_type IDENTIFIER '(' field_seq ')' throws
+                | APICOMMENT ONEWAY function_type IDENTIFIER '(' field_seq ')'
+                | APICOMMENT function_type IDENTIFIER '(' field_seq ')' throws
+                | APICOMMENT function_type IDENTIFIER '(' field_seq ')'
+                '''
+    has_api_comment = isinstance(p[1], str) and p[1].startswith("/*")
+    if has_api_comment:
+        if p[2] == 'oneway':
+            oneway = True
+            base = 2
+        else:
+            oneway = False
+            base = 1
 
-    if p[1] == 'oneway':
-        oneway = True
-        base = 1
+        if p[len(p) - 1] == ')':
+            throws = []
+        else:
+            throws = p[len(p) - 1]
+
+        p[0] = [oneway, p[base + 1], p[base + 2], p[base + 4], throws, p[1]]
     else:
-        oneway = False
-        base = 0
+        if p[1] == 'oneway':
+            oneway = True
+            base = 1
+        else:
+            oneway = False
+            base = 0
 
-    if p[len(p) - 1] == ')':
-        throws = []
-    else:
-        throws = p[len(p) - 1]
+        if p[len(p) - 1] == ')':
+            throws = []
+        else:
+            throws = p[len(p) - 1]
 
-    p[0] = [oneway, p[base + 1], p[base + 2], p[base + 4], throws]
+        p[0] = [oneway, p[base + 1], p[base + 2], p[base + 4], throws, None]
 
 
 def p_function_seq(p):
@@ -802,6 +822,7 @@ def _make_service(name, funcs, extends):
     attrs = {'__module__': thrift_stack[-1].__name__}
     cls = type(name, (extends, ), attrs)
     thrift_services = []
+    thrift_services_doc_map = {}
 
     for func in funcs:
         func_name = func[2]
@@ -824,9 +845,12 @@ def _make_service(name, funcs, extends):
         gen_init(result_cls, result_cls.thrift_spec, result_cls.default_spec)
         setattr(cls, result_name, result_cls)
         thrift_services.append(func_name)
+        if func[-1] is not None:
+            thrift_services_doc_map[func_name] = func[-1]
     if extends is not None and hasattr(extends, 'thrift_services'):
         thrift_services.extend(extends.thrift_services)
     setattr(cls, 'thrift_services', thrift_services)
+    setattr(cls, "doc_map", thrift_services_doc_map)
     return cls
 
 
